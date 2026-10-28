@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Panel de administración · Perritos Perdidos SV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Figtree:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .adm { max-width: 860px; margin: 0 auto; padding-block: 24px 48px; }
+  .adm h1 { font: 400 clamp(32px, 6vw, 48px)/1 var(--font-display); text-transform: uppercase; }
+  .login { display: grid; gap: 12px; max-width: 360px; margin-top: 24px; }
+  .login label { display: grid; gap: 4px; font-weight: 700; font-size: 14px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-block: 16px; }
+  .item { border: 2px solid var(--ink); background: var(--card); padding: 14px; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; margin-bottom: 14px; }
+  .item.hid { opacity: .6; border-style: dashed; }
+  .item img, .item .ph { width: 96px; height: 96px; object-fit: cover; background: var(--soft); display: grid; place-items: center; color: var(--muted); }
+  .item .ph svg { width: 40px; height: 40px; opacity: .6; }
+  .item h2 { font: 700 18px/1.2 var(--font-body); overflow-wrap: anywhere; }
+  .item p { margin: 4px 0 0; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+  .pill { display: inline-block; font: 500 11px/1 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; padding: 4px 8px; border-radius: 999px; background: var(--soft); margin-right: 6px; }
+  .pill.warn { background: var(--lost); color: var(--on-banner); }
+  @media (max-width: 520px) { .item { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="adm">
+  <h1>Panel de administración</h1>
+  <p id="msg" role="status" style="color: var(--muted)"></p>
+
+  <form id="login" class="login" hidden>
+    <label>Correo <input class="field" id="email" type="email" autocomplete="username" required></label>
+    <label>Contraseña <input class="field" id="pass" type="password" autocomplete="current-password" required></label>
+    <button class="btn primary" type="submit">Entrar</button>
+  </form>
+
+  <section id="panel" hidden>
+    <div class="bar">
+      <div class="chips" id="chips">
+        <button class="chip" type="button" data-f="todos" aria-pressed="true">Todos</button>
+        <button class="chip" type="button" data-f="denuncias" aria-pressed="false">Con denuncias</button>
+        <button class="chip" type="button" data-f="ocultos" aria-pressed="false">Ocultos</button>
+      </div>
+      <button class="btn small" id="logout" type="button">Salir</button>
+    </div>
+    <div id="rows"></div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  "use strict";
+  var CFG = window.PERRITOS_CONFIG || {};
+  var ok = /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(CFG.SUPABASE_URL || "") && (CFG.SUPABASE_ANON_KEY || "").length > 40;
+  var $ = function (s) { return document.querySelector(s); };
+  var msg = $("#msg");
+  if (!ok || !window.supabase) { msg.textContent = "Falta completar config.js con los datos de Supabase."; return; }
+  var sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+  var state = { rows: [], flags: {}, filter: "todos" };
+  var PAW = '<svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="32" cy="42" rx="14" ry="11"/><ellipse cx="14" cy="28" rx="6" ry="8"/><ellipse cx="26" cy="15" rx="6" ry="8.5"/><ellipse cx="38" cy="15" rx="6" ry="8.5"/><ellipse cx="50" cy="28" rx="6" ry="8"/></svg>';
+
+  function h(tag, props) {
+    var e = document.createElement(tag); props = props || {};
+    for (var k in props) { var v = props[k]; if (v == null || v === false) continue;
+      if (k === "class") e.className = v; else if (k === "text") e.textContent = v;
+      else if (k.indexOf("on") === 0) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v === true ? "" : v); }
+    for (var i = 2; i < arguments.length; i++) { var c = arguments[i]; if (c == null || c === false) continue; e.append(c.nodeType ? c : document.createTextNode(c)); }
+    return e;
+  }
+  function fmtTel(d) { return d.slice(0, 4) + "-" + d.slice(4); }
+
+  function confirmBtn(label, action) {
+    var timer, armed = false, b = h("button", { class: "btn small", type: "button", text: label });
+    b.addEventListener("click", function () {
+      if (!armed) { armed = true; b.textContent = "¿Seguro? Confirmar"; timer = setTimeout(function () { armed = false; b.textContent = label; }, 4000); return; }
+      clearTimeout(timer); b.disabled = true;
+      Promise.resolve(action()).then(refresh).catch(function () { b.disabled = false; armed = false; b.textContent = label; msg.textContent = "No se pudo completar la acción."; });
+    });
+    return b;
+  }
+
+  function render() {
+    var box = $("#rows"); box.textContent = "";
+    var rows = state.rows.filter(function (r) {
+      if (state.filter === "denuncias") return state.flags[r.id] > 0;
+      if (state.filter === "ocultos") return r.oculto;
+      return true;
+    });
+    if (!rows.length) { box.append(h("p", { text: "No hay reportes en esta lista." })); return; }
+    rows.forEach(function (r) {
+      var img = r.foto_url ? h("img", { src: r.foto_url, alt: "" }) : h("div", { class: "ph" });
+      if (!r.foto_url) img.innerHTML = PAW;
+      var flags = state.flags[r.id] || 0;
+      var acts = h("div", { class: "acts" },
+        h("button", { class: "btn small", type: "button", text: r.oculto ? "Mostrar" : "Ocultar", onclick: function () {
+          sb.from("reportes").update({ oculto: !r.oculto }).eq("id", r.id).then(function (x) { if (x.error) msg.textContent = "No se pudo actualizar."; else refresh(); });
+        } }),
+        confirmBtn("Eliminar", function () {
+          var rm = r.foto_url ? sb.storage.from("fotos").remove([r.id + ".jpg"]) : Promise.resolve();
+          return rm.then(function () { return sb.from("reportes").delete().eq("id", r.id); }).then(function (x) { if (x.error) throw x.error; });
+        })
+      );
+      box.append(h("div", { class: "item" + (r.oculto ? " hid" : "") }, img, h("div", null,
+        h("h2", { text: (r.nombre || "Sin nombre") + " · " + (r.tipo === "perdido" ? "Se busca" : "Encontrado") }),
+        h("div", null,
+          h("span", { class: "pill", text: r.estado }), r.oculto ? h("span", { class: "pill", text: "oculto" }) : null,
+          flags ? h("span", { class: "pill warn", text: flags + (flags === 1 ? " denuncia" : " denuncias") }) : null),
+        h("p", { text: [r.raza, r.color, r.tamano, r.sexo].filter(Boolean).join(" · ") }),
+        h("p", { text: r.municipio + ", " + r.depto + " · " + r.fecha }),
+        r.senas ? h("p", { text: r.senas }) : null,
+        h("p", { text: "Contacto: " + r.contacto + " · " + fmtTel(r.telefono) }),
+        acts)));
+    });
+  }
+
+  function refresh() {
+    msg.textContent = "Cargando...";
+    return Promise.all([
+      sb.from("reportes").select("*").order("creado", { ascending: false }).limit(500),
+      sb.from("denuncias").select("reporte_id").limit(1000)
+    ]).then(function (x) {
+      if (x[0].error) { msg.textContent = "Esta cuenta no tiene permiso de administrador. Revisa el correo en schema.sql."; return; }
+      state.rows = x[0].data || []; state.flags = {};
+      (x[1].data || []).forEach(function (d) { state.flags[d.reporte_id] = (state.flags[d.reporte_id] || 0) + 1; });
+      msg.textContent = state.rows.length + " reportes en total."; render();
+    });
+  }
+
+  function show(session) {
+    $("#login").hidden = !!session; $("#panel").hidden = !session;
+    if (session) refresh(); else msg.textContent = "Entra con la cuenta de administrador.";
+  }
+  $("#login").addEventListener("submit", function (e) {
+    e.preventDefault(); msg.textContent = "Entrando...";
+    sb.auth.signInWithPassword({ email: $("#email").value.trim(), password: $("#pass").value }).then(function (r) {
+      if (r.error) { msg.textContent = "Correo o contraseña incorrectos."; return; }
+      $("#pass").value = ""; show(r.data.session);
+    });
+  });
+  $("#logout").addEventListener("click", function () { sb.auth.signOut().then(function () { state.rows = []; show(null); }); });
+  $("#chips").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-f]"); if (!b) return; state.filter = b.getAttribute("data-f");
+    document.querySelectorAll("#chips .chip").forEach(function (c) { c.setAttribute("aria-pressed", c === b ? "true" : "false"); }); render();
+  });
+  sb.auth.getSession().then(function (r) { show(r.data && r.data.session); });
+})();
+</script>
+</body>
+</html>

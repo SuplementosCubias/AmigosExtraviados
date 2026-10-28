@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Reporta y encuentra perritos perdidos en El Salvador.">
+<title>Perritos Perdidos SV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Figtree:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="32" cy="42" rx="14" ry="11"/><ellipse cx="14" cy="28" rx="6" ry="8"/><ellipse cx="26" cy="15" rx="6" ry="8.5"/><ellipse cx="38" cy="15" rx="6" ry="8.5"/><ellipse cx="50" cy="28" rx="6" ry="8"/></svg>
+      Perritos Perdidos SV
+    </div>
+    <small>Para todo El Salvador · 14 departamentos</small>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h1>Ayúdalos a <em>volver a casa</em></h1>
+      <p>Publica a tu perro extraviado o al que encontraste en la calle. Mientras más gente lo vea, más rápido aparece su familia.</p>
+      <div class="cta">
+        <button class="btn lost" id="openLost" type="button">Perdí a mi perro</button>
+        <button class="btn primary" id="openFound" type="button">Encontré un perro</button>
+      </div>
+    </div>
+    <div class="stats" aria-label="Resumen de reportes">
+      <div class="l"><b id="nLost">0</b><span>Se buscan</span></div>
+      <div class="f"><b id="nFound">0</b><span>Encontrados</span></div>
+      <div class="h"><b id="nHome">0</b><span>Ya en casa</span></div>
+    </div>
+  </section>
+
+  <div id="note" class="note" hidden></div>
+
+  <div class="filters" role="group" aria-label="Filtros">
+    <div class="chips" id="chips">
+      <button class="chip" type="button" data-f="activos" aria-pressed="true">Todos</button>
+      <button class="chip" type="button" data-f="perdido" aria-pressed="false">Se buscan</button>
+      <button class="chip" type="button" data-f="encontrado" aria-pressed="false">Encontrados</button>
+      <button class="chip" type="button" data-f="reunido" aria-pressed="false">Ya en casa</button>
+    </div>
+    <span class="spacer"></span>
+    <label class="sr" for="fDepto">Departamento</label>
+    <select class="field" id="fDepto"><option value="">Todo El Salvador</option></select>
+    <label class="sr" for="fQ">Buscar</label>
+    <input class="field" id="fQ" type="search" placeholder="Raza, color, colonia...">
+  </div>
+
+  <main id="list" aria-live="polite"></main>
+
+  <section class="tips">
+    <div>
+      <h2>Si perdiste a tu perro</h2>
+      <ul>
+        <li>Publica el mismo día. Las primeras horas son las que más cuentan.</li>
+        <li>Sube una foto clara y anota señas que lo distingan: manchas, collar, cicatrices.</li>
+        <li>Pregunta en las tiendas, veterinarias y casas de tu colonia y de las colonias vecinas.</li>
+        <li>Pega volantes con tu número en postes y portones cercanos.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Si encontraste un perro</h2>
+      <ul>
+        <li>Revisa si trae collar, placa o chip en una veterinaria.</li>
+        <li>Publícalo con la zona donde lo viste y una foto.</li>
+        <li>Antes de entregarlo, pide detalles que solo el dueño conocería.</li>
+        <li>Mantenlo en un lugar seguro y con agua mientras aparece su familia.</li>
+      </ul>
+    </div>
+  </section>
+
+  <p class="fine">Los números de teléfono que publiques se ven públicamente. Escribe una zona o un punto de referencia en lugar de tu dirección exacta.</p>
+</div>
+
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <form id="f" novalidate>
+    <h2 id="dlgTitle">Publicar un reporte</h2>
+    <fieldset class="seg">
+      <legend class="sr">Tipo de reporte</legend>
+      <label><input type="radio" name="tipo" value="perdido" checked><span>Perdí a mi perro</span></label>
+      <label><input type="radio" name="tipo" value="encontrado"><span>Encontré un perro</span></label>
+    </fieldset>
+    <div class="cols">
+      <label>Nombre del perro <small id="hintNombre">Si no lo sabes, déjalo vacío.</small>
+        <input class="field" id="f-nombre" maxlength="40" autocomplete="off"></label>
+      <label>Raza <small>O "criollo" si es mestizo.</small>
+        <input class="field" id="f-raza" maxlength="40" autocomplete="off"></label>
+      <label>Color
+        <input class="field" id="f-color" maxlength="40" placeholder="Café con patas blancas" autocomplete="off"></label>
+      <label>Tamaño
+        <select class="field" id="f-tamano"><option value="">Sin indicar</option><option>Pequeño</option><option>Mediano</option><option>Grande</option></select></label>
+      <label>Sexo
+        <select class="field" id="f-sexo"><option value="">Sin indicar</option><option>Macho</option><option>Hembra</option></select></label>
+      <label><span id="lblFecha">¿Cuándo se perdió?</span>
+        <input class="field" id="f-fecha" type="date" required></label>
+      <label>Departamento
+        <select class="field" id="f-depto" required><option value="">Elige uno</option></select></label>
+      <label>Municipio o colonia
+        <input class="field" id="f-muni" maxlength="60" required autocomplete="off"></label>
+      <label class="full">Punto de referencia <small>Cerca de qué lugar se vio por última vez.</small>
+        <input class="field" id="f-ref" maxlength="90" autocomplete="off"></label>
+      <label class="full">Señas particulares
+        <textarea class="field" id="f-senas" maxlength="400" placeholder="Collar rojo, una oreja caída, responde a su nombre..."></textarea></label>
+      <label class="full">Foto
+        <input class="field" id="f-foto" type="file" accept="image/*">
+        <img id="preview" alt="Vista previa de la foto"></label>
+      <label>Tu nombre
+        <input class="field" id="f-contacto" maxlength="40" required autocomplete="name"></label>
+      <label>WhatsApp <small>8 dígitos, sin el 503.</small>
+        <input class="field" id="f-tel" type="tel" inputmode="numeric" maxlength="9" placeholder="7123-4567" required autocomplete="tel-national"></label>
+    </div>
+    <div class="hp" aria-hidden="true"><label>No llenar este campo<input id="f-web" type="text" tabindex="-1" autocomplete="off"></label></div>
+    <p id="err" role="alert"></p>
+    <div class="row">
+      <button class="btn" type="button" id="cancel">Cancelar</button>
+      <button class="btn primary" type="submit" id="send">Publicar reporte</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
